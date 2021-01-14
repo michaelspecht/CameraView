@@ -604,8 +604,9 @@ public class Camera2Engine extends CameraBaseEngine implements
                     LOG.i("CameraCaptureSession.StateCallback reported onReady.");
                 }
             }, null);
-        } catch (CameraAccessException e) {
-            throw createCameraException(e);
+        } catch (Throwable e) {
+            stop(true);
+            throw new CameraException(e, CameraException.REASON_FAILED_TO_CONNECT);
         }
         return task.getTask();
     }
