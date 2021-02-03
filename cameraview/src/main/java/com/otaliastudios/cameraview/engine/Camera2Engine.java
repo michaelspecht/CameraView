@@ -517,10 +517,14 @@ public class Camera2Engine extends CameraBaseEngine implements
             }
             mPreviewStreamSurface = ((SurfaceHolder) output).getSurface();
         } else if (outputClass == SurfaceTexture.class) {
-            ((SurfaceTexture) output).setDefaultBufferSize(
-                    mPreviewStreamSize.getWidth(),
-                    mPreviewStreamSize.getHeight());
-            mPreviewStreamSurface = new Surface((SurfaceTexture) output);
+            try {
+                ((SurfaceTexture) output).setDefaultBufferSize(
+                        mPreviewStreamSize.getWidth(),
+                        mPreviewStreamSize.getHeight());
+                mPreviewStreamSurface = new Surface((SurfaceTexture) output);
+            } catch (Throwable e) {
+                throw new CameraException(e, CameraException.REASON_FAILED_TO_START_PREVIEW);
+            }
         } else {
             throw new RuntimeException("Unknown CameraPreview output class.");
         }
