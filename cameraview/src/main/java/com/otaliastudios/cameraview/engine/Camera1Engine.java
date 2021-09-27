@@ -13,6 +13,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
+import android.util.Log;
 import android.view.SurfaceHolder;
 
 import com.google.android.gms.tasks.Task;
@@ -37,6 +38,7 @@ import com.otaliastudios.cameraview.gesture.Gesture;
 import com.otaliastudios.cameraview.controls.Hdr;
 import com.otaliastudios.cameraview.controls.Mode;
 import com.otaliastudios.cameraview.controls.WhiteBalance;
+import com.otaliastudios.cameraview.gesture.GestureType;
 import com.otaliastudios.cameraview.internal.CropHelper;
 import com.otaliastudios.cameraview.metering.MeteringRegions;
 import com.otaliastudios.cameraview.metering.MeteringTransform;
@@ -59,7 +61,8 @@ import java.util.List;
 public class Camera1Engine extends CameraBaseEngine implements
         Camera.PreviewCallback,
         Camera.ErrorCallback,
-        ByteBufferFrameManager.BufferCallback {
+        Camera.AutoFocusCallback,
+        ByteBufferFrameManager.BufferCallback, Camera.AutoFocusMoveCallback {
     private static final String JOB_FOCUS_RESET = "focus reset";
     private static final String JOB_FOCUS_END = "focus end";
 
@@ -186,12 +189,19 @@ public class Camera1Engine extends CameraBaseEngine implements
         try {
             mCamera.setDisplayOrientation(getAngles().offset(Reference.SENSOR, Reference.VIEW,
                     Axis.ABSOLUTE)); // <- not allowed during preview
+
+            mCamera.setAutoFocusMoveCallback(this);
         } catch (Exception e) {
             LOG.e("onStartEngine:", "Failed to connect. Can't set display orientation, maybe preview already exists?");
             throw new CameraException(CameraException.REASON_FAILED_TO_CONNECT);
         }
         LOG.i("onStartEngine:", "Ended");
         return Tasks.forResult(mCameraOptions);
+    }
+
+    @Override
+    public void onAutoFocus(boolean success, Camera camera) {
+
     }
 
     @EngineThread
@@ -265,6 +275,7 @@ public class Camera1Engine extends CameraBaseEngine implements
 
         mCamera.setPreviewCallbackWithBuffer(null); // Release anything left
         mCamera.setPreviewCallbackWithBuffer(this); // Add ourselves
+        mCamera.setAutoFocusMoveCallback(this);
         getFrameManager().setUp(PREVIEW_FORMAT, mPreviewStreamSize, getAngles());
 
         LOG.i("onStartPreview", "Starting preview with startPreview().");
@@ -342,7 +353,7 @@ public class Camera1Engine extends CameraBaseEngine implements
                 // This is anticipated by the exception in onStopBind() (see above).
                 //
                 // 12:29:32.163 E Camera3-Device: Camera 0: clearStreamingRequest: Device has encountered a serious error[0m
-                // 12:29:32.163 E Camera2-StreamingProcessor: stopStream: Camera 0: Can't clear stream request: Function not implemented (-38)[0m
+                // 12:29:32.1onAutoFocusMoving63 E Camera2-StreamingProcessor: stopStream: Camera 0: Can't clear stream request: Function not implemented (-38)[0m
                 // 12:29:32.163 E Camera2Client: stopPreviewL: Camera 0: Can't stop streaming: Function not implemented (-38)[0m
                 // 12:29:32.273 E Camera2-StreamingProcessor: deletePreviewStream: Unable to delete old preview stream: Device or resource busy (-16)[0m
                 // 12:29:32.274 E Camera2-CallbackProcessor: deleteStream: Unable to delete callback stream: Device or resource busy (-16)[0m
@@ -938,6 +949,18 @@ public class Camera1Engine extends CameraBaseEngine implements
                 }
             }
         });
+    }
+
+    @Override
+    public void onAutoFocusMoving(boolean start, Camera camera) {
+        if (start) {
+            Log.d("AUTOFOCUS", "autofocus started");
+
+            getCallback().dispatchOnFocusStart(Gesture.SCROLL_HORIZONTAL, new PointF(this.mPreview.getSurfaceSize().getWidth() / 2F, this.mPreview.getSurfaceSize().getHeight() / 2F));
+        } else {
+            Log.d("AUTOFOCUS", "autofocus ended");
+            getCallback().dispatchOnFocusEnd(Gesture.SCROLL_HORIZONTAL, false, new PointF(this.mPreview.getSurfaceSize().getWidth() / 2F, this.mPreview.getSurfaceSize().getHeight() / 2F));
+        }
     }
 
     //endregion
